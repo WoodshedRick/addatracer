@@ -1,6 +1,7 @@
 // Canvas 2D drawing of the comet / line tracer. Used for both the live preview and the export,
 // so what you see is what you get. Flight coordinates are video pixels; `videoScale` = video height / 1080
-// (sizes are designed at 1080p) and `k` = canvas px per video px (1 for export, smaller for an on-screen preview).
+// (sizes are designed at 1080p), `k` = canvas px per video px (1 for export, smaller for an on-screen preview) and
+// `origin` = the video pixel that lands on the canvas's top-left corner (non-zero for a cropped, e.g. vertical, export).
 
 import { cometAt, headRadius, lineAt, type Flight } from "./flight";
 import type { Pt } from "./path";
@@ -9,8 +10,8 @@ import { colAt, type TracerStyle } from "./style";
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
 const scratch = new Map<string, OffscreenCanvas>();
-function offscreen(w: number, h: number): OffscreenCanvas {
-  const k = `${w}x${h}`;
+function offscreen(w: number, h: number, tag = ""): OffscreenCanvas {
+  const k = `${w}x${h}${tag}`;
   let c = scratch.get(k);
   if (!c) {
     c = new OffscreenCanvas(w, h);
@@ -19,22 +20,66 @@ function offscreen(w: number, h: number): OffscreenCanvas {
   return c;
 }
 
+// Canvas `filter` (used for the glow blur) is missing in older Safari, where setting it silently does nothing.
+// Test it once by blurring a small square; if nothing spreads, fall back to a shrink-and-enlarge blur.
+let filterOk: boolean | null = null;
+/** for testing the fallback in a browser that has filters */
+export function setCanvasFilterSupport(ok: boolean | null) {
+  filterOk = ok;
+}
+function canFilter(): boolean {
+  if (filterOk !== null) return filterOk;
+  try {
+    const c = new OffscreenCanvas(24, 24), x = c.getContext("2d")!;
+    x.filter = "blur(3px)";
+    x.fillStyle = "#fff";
+    x.fillRect(9, 9, 6, 6);
+    filterOk = x.getImageData(4, 12, 1, 1).data[3] > 0;
+  } catch {
+    filterOk = false;
+  }
+  return filterOk;
+}
+
+/** Draw `src` (same size as the target canvas) blurred by about `r` px. */
+function drawBlurred(ctx: Ctx, src: OffscreenCanvas, r: number) {
+  if (canFilter()) {
+    ctx.filter = `blur(${r.toFixed(1)}px)`;
+    ctx.drawImage(src, 0, 0);
+    ctx.filter = "none";
+    return;
+  }
+  const W = src.width, H = src.height, f = Math.max(1, Math.min(24, r / 1.1));
+  const w = Math.max(1, Math.round(W / f)), h = Math.max(1, Math.round(H / f));
+  const sm = offscreen(w, h, "blur"), s = sm.getContext("2d")!;
+  s.clearRect(0, 0, w, h);
+  s.imageSmoothingEnabled = true;
+  s.imageSmoothingQuality = "high";
+  s.drawImage(src, 0, 0, w, h);
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(sm, 0, 0, W, H);
+  ctx.restore();
+}
+
 const rgba = (c: number[], a: number) => `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`;
 
 /** Draw the tracer for time t (seconds after impact). Returns false when nothing is on screen. */
-export function drawTracer(ctx: Ctx, F: Flight, t: number, style: TracerStyle, videoScale = 1, k = 1): boolean {
-  if (style.type === "line") return drawLine(ctx, F, t, style, videoScale, k);
-  return drawComet(ctx, F, t, style, videoScale, k);
+export function drawTracer(ctx: Ctx, F: Flight, t: number, style: TracerStyle, videoScale = 1, k = 1, origin: Pt = [0, 0]): boolean {
+  if (style.type === "line") return drawLine(ctx, F, t, style, videoScale, k, origin);
+  return drawComet(ctx, F, t, style, videoScale, k, origin);
 }
 
-const toView = (pts: Pt[], k: number): Pt[] => (k === 1 ? pts : pts.map((p) => [p[0] * k, p[1] * k]));
+const toView = (pts: Pt[], k: number, o: Pt): Pt[] =>
+  k === 1 && !o[0] && !o[1] ? pts : pts.map((p) => [(p[0] - o[0]) * k, (p[1] - o[1]) * k]);
 
-function drawComet(ctx: Ctx, F: Flight, t: number, s: TracerStyle, videoScale: number, k: number): boolean {
+function drawComet(ctx: Ctx, F: Flight, t: number, s: TracerStyle, videoScale: number, k: number, origin: Pt): boolean {
   const c = cometAt(F, t, { tail: s.tailSec, scale: videoScale });
   if (!c.visible || c.pts.length < 2) return false;
   const scale = videoScale * k;
   const rh = headRadius(c.headX) * s.cometSize * scale;
-  const pts = toView(c.pts, k), n = pts.length, head = pts[n - 1], hc = colAt(s, 1);
+  const pts = toView(c.pts, k, origin), n = pts.length, head = pts[n - 1], hc = colAt(s, 1);
   const W = ctx.canvas.width, H = ctx.canvas.height;
   ctx.save();
   ctx.globalAlpha = c.alpha;
@@ -58,9 +103,7 @@ function drawComet(ctx: Ctx, F: Flight, t: number, s: TracerStyle, videoScale: n
       o.beginPath();
       o.arc(head[0], head[1], rh * (wm === 2.4 ? 2.6 : 1.9), 0, Math.PI * 2);
       o.fill();
-      ctx.filter = `blur(${Math.max(0.5, blur * Math.min(1.6, s.glowStrength)).toFixed(1)}px)`;
-      ctx.drawImage(off, 0, 0);
-      ctx.filter = "none";
+      drawBlurred(ctx, off, Math.max(0.5, blur * Math.min(1.6, s.glowStrength)));
     }
   }
   // core: tapering tail, white-hot or colored
@@ -126,10 +169,10 @@ function strokeGradientPath(ctx: Ctx, pts: Pt[], s: TracerStyle, width: number, 
   }
 }
 
-function drawLine(ctx: Ctx, F: Flight, t: number, s: TracerStyle, videoScale: number, k: number): boolean {
+function drawLine(ctx: Ctx, F: Flight, t: number, s: TracerStyle, videoScale: number, k: number, origin: Pt): boolean {
   const c = lineAt(F, t, { hold: s.hold });
   if (!c.visible || c.pts.length < 2) return false;
-  const w = Math.max(1, s.lineWidth * videoScale * k), pts = toView(c.pts, k);
+  const w = Math.max(1, s.lineWidth * videoScale * k), pts = toView(c.pts, k, origin);
   const W = ctx.canvas.width, H = ctx.canvas.height;
   ctx.save();
   ctx.globalAlpha = c.alpha;
@@ -137,9 +180,7 @@ function drawLine(ctx: Ctx, F: Flight, t: number, s: TracerStyle, videoScale: nu
     const off = offscreen(W, H), o = off.getContext("2d")!;
     o.clearRect(0, 0, W, H);
     strokeGradientPath(o, pts, s, w * 3.2, Math.min(1, 0.85 * s.glowStrength), false);
-    ctx.filter = `blur(${(w * 1.6 * Math.min(1.6, s.glowStrength)).toFixed(1)}px)`;
-    ctx.drawImage(off, 0, 0);
-    ctx.filter = "none";
+    drawBlurred(ctx, off, w * 1.6 * Math.min(1.6, s.glowStrength));
   }
   strokeGradientPath(ctx, pts, s, w, 1, s.core && s.glow);
   ctx.restore();

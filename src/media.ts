@@ -52,6 +52,10 @@ export interface ExportJob {
   /** impact frame index (0 = first frame) */
   impactFrame: number;
   style: TracerStyle;
+  /** MP4 only: crop a full-height window starting at video x (vertical 9:16 export), output 1080×1920 */
+  crop?: { x: number; w: number };
+  /** MP4 only: small "Made with Flighted" credit */
+  credit?: boolean;
   onProgress?: (p: number) => void;
   signal?: AbortSignal;
 }
@@ -62,13 +66,33 @@ export function webCodecsAvailable(): boolean {
   return typeof VideoEncoder !== "undefined" && typeof VideoDecoder !== "undefined";
 }
 
+export const CREDIT = "Made with Flighted · @garrickwoodsgolf";
+
+/** The credit line, bottom-right (or, for vertical video, left and above where TikTok / Reels put their captions). */
+export function drawCredit(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, W: number, H: number) {
+  const vertical = H > W, fs = Math.max(12, Math.round(Math.min(W, H) * 0.024));
+  ctx.save();
+  ctx.font = `600 ${fs}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = vertical ? "left" : "right";
+  ctx.shadowColor = "rgba(0,0,0,.6)";
+  ctx.shadowBlur = fs * 0.3;
+  ctx.fillStyle = "rgba(255,255,255,.85)";
+  ctx.fillText(CREDIT, vertical ? W * 0.06 : W - fs, vertical ? H * 0.7 : H - fs);
+  ctx.restore();
+}
+
 /** The clip with the tracer burned in, as MP4 (H.264 + original audio). */
 export async function exportBakedMp4(job: ExportJob): Promise<Blob> {
-  const { file, info, flight, impactFrame, style } = job;
-  if (!webCodecsAvailable()) throw new Error("This browser can't encode video (no WebCodecs). Use Chrome or Edge.");
+  const { file, info, flight, impactFrame, style, crop } = job;
+  if (!webCodecsAvailable()) throw new Error("This browser can't encode video (no WebCodecs). Try Chrome, Edge or Safari 26+.");
   const W = info.width, H = info.height;
-  if (!(await canEncodeVideo("avc", { width: W, height: H }))) throw new Error(`This browser can't encode ${W}×${H} H.264.`);
-  const canvas = new OffscreenCanvas(W, H), ctx = canvas.getContext("2d")!;
+  // vertical: always 1080×1920, the size Reels / TikTok / Shorts want
+  const OW = crop ? 1080 : W, OH = crop ? 1920 : H, k = OH / H;
+  if (!(await canEncodeVideo("avc", { width: OW, height: OH }))) throw new Error(`This browser can't encode ${OW}×${OH} H.264.`);
+  const canvas = new OffscreenCanvas(OW, OH), ctx = canvas.getContext("2d")!;
+  // full frame first (drawWithFit applies any rotation), then crop from it
+  const full = crop ? new OffscreenCanvas(W, H) : null, fctx = full?.getContext("2d");
   const vScale = H / 1080, tImpact = impactFrame / info.fps;
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   const target = new BufferTarget();
@@ -86,13 +110,17 @@ export async function exportBakedMp4(job: ExportJob): Promise<Blob> {
         quality: QUALITY_HIGH,
         forceTranscode: true,
         allowTransformationMetadata: false,
-        processedWidth: W,
-        processedHeight: H,
+        processedWidth: OW,
+        processedHeight: OH,
         process: (sample) => {
-          ctx.clearRect(0, 0, W, H);
-          sample.drawWithFit(ctx, { fit: "fill" });
+          ctx.clearRect(0, 0, OW, OH);
+          if (crop && full && fctx) {
+            sample.drawWithFit(fctx, { fit: "fill" });
+            ctx.drawImage(full, crop.x, 0, crop.w, H, 0, 0, OW, OH);
+          } else sample.drawWithFit(ctx, { fit: "fill" });
           // sample timestamps match the <video> element's clock (checked on an edit-listed MOV), so no firstTs shift
-          drawTracer(ctx, flight, sample.timestamp - tImpact, style, vScale);
+          drawTracer(ctx, flight, sample.timestamp - tImpact, style, vScale, k, [crop?.x ?? 0, 0]);
+          if (job.credit) drawCredit(ctx, OW, OH);
           return canvas;
         },
       },
@@ -148,6 +176,8 @@ export async function exportAlphaWebm(job: ExportJob): Promise<Blob> {
   const { info, flight, impactFrame, style } = job;
   if (!webCodecsAvailable()) throw new Error("This browser can't encode video (no WebCodecs). Use Chrome or Edge.");
   const W = info.width, H = info.height, vScale = H / 1080;
+  if (!(await canEncodeVideo("vp9", { width: W, height: H })))
+    throw new Error("This browser can't make VP9 video. Use the PNG overlay, or Chrome / Edge on a computer.");
   const canvas = new OffscreenCanvas(W, H), ctx = canvas.getContext("2d")!;
   const target = new BufferTarget();
   const output = new Output({ format: new WebMOutputFormat(), target });

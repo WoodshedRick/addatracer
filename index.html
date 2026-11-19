@@ -11,7 +11,10 @@
   <body>
     <header class="top">
       <div class="brand"><span class="logo" aria-hidden="true"></span>Flighted <small>free golf shot tracers, right in your browser</small></div>
-      <div class="privacy">🔒 Your videos never leave your device.</div>
+      <div class="top-r">
+        <span class="privacy">🔒 Your videos never leave your device. No account, no tracking.</span>
+        <button id="help" class="btn sm" title="How it works">How it works</button>
+      </div>
     </header>
 
     <main class="layout">
@@ -35,6 +38,10 @@
             <div class="big">Add golf clips</div>
             <div>Tap to pick videos from your camera roll or files, or drop them here. MP4 / MOV from your phone or camera.</div>
           </label>
+          <div class="empty-more">
+            <button id="sampleBtn" class="btn">▶ Try the sample clip</button>
+            <span class="hint">Then tap the ball, the peak and where it lands, and download. Works best with the camera on a tripod.</span>
+          </div>
         </div>
 
         <div id="work" class="work" hidden>
@@ -79,6 +86,8 @@
           <label class="row">Club
             <select id="club"></select>
           </label>
+          <details class="sub">
+          <summary>More shot options</summary>
           <div class="row">Shape
             <div class="seg" id="shape" role="group" aria-label="Shot shape">
               <button data-v="auto" class="btn">Auto</button>
@@ -105,13 +114,41 @@
           </div>
           <div class="row">
             <button id="clearBend" class="btn sm">Remove bends</button>
+          </div>
+          </details>
+          <div class="row">
             <button id="clearMarks" class="btn sm danger">Clear marks</button>
           </div>
         </details>
 
         <details open>
+          <summary>Download</summary>
+          <div class="row">Shape
+            <div class="seg" id="exShape" role="group" aria-label="Video shape">
+              <button data-v="original" class="btn">Original</button>
+              <button data-v="vertical" class="btn">Vertical 9:16</button>
+            </div>
+          </div>
+          <p id="exShapeHint" class="hint" hidden>Vertical crops a 9:16 window around the shot (the shaded area won't be in the video) for Reels, TikTok and Shorts.</p>
+          <label class="row chk"><input id="exCredit" type="checkbox" /> Add a small "Made with Flighted" credit</label>
+          <button id="exMp4" class="btn primary block">Download video</button>
+          <button id="exAll" class="btn block">Download all marked clips</button>
+          <div id="exProg" class="prog" hidden><div class="bar"><i></i></div><span id="exMsg"></span><button id="exCancel" class="btn sm">Cancel</button></div>
+          <div id="exSave" class="save" hidden></div>
+          <p id="exWarn" class="warn" hidden></p>
+          <details class="sub">
+            <summary>Overlays for editing apps</summary>
+            <button id="exPng" class="btn block">Overlay: PNG sequence (.zip)</button>
+            <button id="exWebm" class="btn block">Overlay: transparent WebM</button>
+            <p class="hint">Just the tracer on a transparent background, original shape, no credit, so you can put it on its own track in Premiere, Resolve or CapCut.</p>
+          </details>
+        </details>
+
+        <details open>
           <summary>Style</summary>
           <div class="presets" id="presets"></div>
+          <details class="sub" id="customize">
+          <summary>Customize</summary>
           <div class="row">Type
             <div class="seg" id="stType" role="group" aria-label="Tracer type">
               <button data-v="comet" class="btn">Comet</button>
@@ -136,6 +173,8 @@
           <label class="row" id="rowTail">Tail length <input id="stTailSec" type="range" min="0.15" max="1.2" step="0.05" /> <output id="stTailV"></output></label>
           <label class="row" id="rowWidth">Line thickness <input id="stWidth" type="range" min="1" max="16" step="0.5" /> <output id="stWidthV"></output></label>
           <label class="row" id="rowHold">Hold after landing <input id="stHold" type="range" min="0" max="4" step="0.1" /> <output id="stHoldV"></output></label>
+          <button id="stReset" class="btn sm">Back to the default look</button>
+          </details>
           <p class="hint">Style applies to every clip.</p>
         </details>
 
@@ -145,19 +184,32 @@
           <button id="hangTableReset" class="btn sm">Reset to defaults</button>
         </details>
 
-        <details open>
-          <summary>Export</summary>
-          <button id="exMp4" class="btn primary block">Download MP4 with tracer</button>
-          <button id="exPng" class="btn block">Overlay: PNG sequence (.zip)</button>
-          <button id="exWebm" class="btn block">Overlay: transparent WebM</button>
-          <button id="exAll" class="btn block">MP4s for all marked clips</button>
-          <div id="exProg" class="prog" hidden><div class="bar"><i></i></div><span id="exMsg"></span><button id="exCancel" class="btn sm">Cancel</button></div>
-          <div id="exSave" class="save" hidden></div>
-          <p class="hint">Overlays have no video, just the tracer on a transparent background, so you can put it on its own track in Premiere or Resolve.</p>
-          <p id="exWarn" class="warn" hidden></p>
-        </details>
       </aside>
     </main>
+
+    <footer class="foot">
+      <span>Flighted is free, made by <b>Garrick Woods Golf</b>:</span>
+      <a href="https://www.youtube.com/@garrickwoodsgolf" target="_blank" rel="noopener">YouTube</a>
+      <a href="https://www.instagram.com/garrickwoodsgolf/" target="_blank" rel="noopener">Instagram</a>
+      <a href="https://github.com/garrickwoods/flighted" target="_blank" rel="noopener" id="srcLink">Source</a>
+    </footer>
+
+    <dialog id="intro" class="intro" aria-labelledby="introH">
+      <h2 id="introH">Trace a shot in three taps</h2>
+      <ol>
+        <li><b>Add a clip</b>, or try the sample.</li>
+        <li>Pause on <b>impact</b> and tap the <b>ball</b>.</li>
+        <li>Scrub to the top of the flight and tap the <b>peak</b>.</li>
+        <li>Scrub to where it <b>lands</b> and tap it.</li>
+        <li>Press <b>Download video</b>. Pick <b>Vertical 9:16</b> for Reels, TikTok and Shorts.</li>
+      </ol>
+      <p class="hint">Works best with the camera on a tripod. Your videos never leave your device. No account, no tracking.</p>
+      <div class="intro-btns">
+        <button id="introSample" class="btn primary">Try the sample clip</button>
+        <button id="introAdd" class="btn">Add my clips</button>
+        <button id="introSkip" class="btn">Skip</button>
+      </div>
+    </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

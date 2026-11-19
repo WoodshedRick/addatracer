@@ -1,7 +1,7 @@
 import "./style.css";
 import { pathPts, shapeBend, type Pt, type Shape } from "./tracer/path";
 import { CLUBS, Flight, hangTime, ricochet, type Club, type ShotMarks } from "./tracer/flight";
-import { drawTracer } from "./tracer/draw";
+import { drawTracer, setCanvasFilterSupport } from "./tracer/draw";
 import { DEFAULT_STYLE, PRESETS, colAt, type TracerStyle } from "./tracer/style";
 import {
   download, exportAlphaWebm, exportBakedMp4, exportPngSequence, outName, probe, webCodecsAvailable, type ClipInfo,
@@ -59,6 +59,7 @@ const store = {
 };
 let style: TracerStyle = store.get("style", { ...DEFAULT_STYLE });
 let hangTable: Partial<Record<Club, number>> = store.get("hang", {});
+let exportOpts: { shape: "original" | "vertical"; credit: boolean } = store.get("export", { shape: "original", credit: true });
 
 // ---------------------------------------------------------------- dom
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -112,6 +113,17 @@ function complete(c: Clip): boolean {
 function marksOf(c: Clip): ShotMarks {
   const p = c.pts;
   return { S: p.S!, A: p.A!, E: p.E!, M: p.M, N: p.N, R: p.R, ricochet: c.ricochet, shape: c.shape, club: c.club, hang: c.hang };
+}
+
+/** Vertical 9:16 export: a full-height window centred on the shot (undefined when exporting the original shape). */
+function cropFor(c: Clip, W: number, H: number): { x: number; w: number } | undefined {
+  if (exportOpts.shape !== "vertical" || W / H <= 9 / 16 + 0.01 || !complete(c)) return undefined;
+  const p = c.pts, w = Math.round((H * 9) / 16);
+  const { rise, fall } = pathPts(p.S!, p.A!, p.E!, { shape: c.shape, M: p.M, N: p.N });
+  const xs = [...rise, ...fall].map((q) => q[0]).concat(c.ricochet && p.R ? [p.R[0]] : []);
+  // halfway between the ball's start and the middle of the flight, so the golfer stays in frame too
+  const mid = (p.S![0] + (Math.min(...xs) + Math.max(...xs)) / 2) / 2;
+  return { x: Math.round(Math.max(0, Math.min(W - w, mid - w / 2))), w };
 }
 
 const flightCache = new WeakMap<Clip, { sig: string; F: Flight }>();
@@ -346,6 +358,12 @@ function draw() {
       cx.fill();
     }
   }
+  const crop = cropFor(c, ...vidSize());
+  if (crop) {
+    cx.fillStyle = "rgba(0,0,0,.55)";
+    cx.fillRect(0, 0, crop.x * k, cv.height);
+    cx.fillRect((crop.x + crop.w) * k, 0, cv.width - (crop.x + crop.w) * k, cv.height);
+  }
   if (drag) loupe(drag.at, drag.key, k, dpr);
   // timecode
   const j = frameIdx(), rel = c.impactFrame === null ? null : j - c.impactFrame;
@@ -418,7 +436,7 @@ const STEPS: { k: Tool; opt?: boolean }[] = [
   { k: "I" }, { k: "S" }, { k: "M", opt: true }, { k: "A" }, { k: "N", opt: true }, { k: "E" }, { k: "R", opt: true },
 ];
 const INSTR: Record<Tool, string> = {
-  I: "Scrub to the frame where the club hits the ball (use <b>−1f / +1f</b> or ← →), then press <b>Set impact frame here</b>.",
+  I: "Play or scrub to the frame where the club hits the ball (<b>−1f / +1f</b> step one frame), pause, then <b>tap the ball</b>.",
   S: "Tap the <b>ball</b> on the impact frame. Drag to fine-tune; the magnifier helps.",
   M: "Optional <b>bend 1</b>: scrub forward and tap a point the ball passes through on the way up.",
   A: "Scrub forward to the ball's <b>highest point</b> and tap it.",
@@ -510,8 +528,11 @@ cv.addEventListener("pointerdown", (e) => {
   const c = clip();
   if (!c) return;
   if (c.impactFrame === null) {
-    vid.paused ? vid.play() : vid.pause();
-    return;
+    if (!vid.paused) return void vid.pause();
+    // first tap on a paused frame: that's the impact frame, and the tap is the ball
+    c.impactFrame = frameIdx();
+    tool = "S";
+    toast("Impact set on this frame. Now find the peak.");
   }
   const p = evVideoPt(e);
   const hit = view === "marks" ? hitMarker(c, p, e.pointerType !== "mouse") : null;
@@ -848,9 +869,13 @@ async function runExport(kind: "mp4" | "png" | "webm", list: Clip[]) {
         msg.textContent = `${label}${Math.round(p * 100)}%`;
       };
       onProgress(0);
-      const job = { file: c.file, info, flight: flightOf(c)!, impactFrame: c.impactFrame!, style, onProgress, signal: busy.signal };
+      const crop = kind === "mp4" ? cropFor(c, info.width, info.height) : undefined;
+      const job = {
+        file: c.file, info, flight: flightOf(c)!, impactFrame: c.impactFrame!, style, onProgress, signal: busy.signal,
+        crop, credit: kind === "mp4" && exportOpts.credit,
+      };
       const t0 = performance.now();
-      if (kind === "mp4") deliver(await exportBakedMp4(job), outName(c.file, "tracer.mp4"));
+      if (kind === "mp4") deliver(await exportBakedMp4(job), outName(c.file, crop ? "tracer_vertical.mp4" : "tracer.mp4"));
       else if (kind === "png") deliver(await exportPngSequence(job), outName(c.file, "tracer_png.zip"));
       else deliver(await exportAlphaWebm(job), outName(c.file, "tracer_alpha.webm"));
       console.info(`[flighted] ${kind} export of ${c.file.name} took ${((performance.now() - t0) / 1000).toFixed(1)} s`);
@@ -875,12 +900,67 @@ $("exWebm").onclick = () => runExport("webm", [clip()]);
 $("exAll").onclick = () => runExport("mp4", clips.filter(complete));
 $("exCancel").onclick = () => busy?.abort();
 
+function syncExportOpts() {
+  for (const b of $("exShape").querySelectorAll<HTMLButtonElement>("button")) b.setAttribute("aria-pressed", String(b.dataset.v === exportOpts.shape));
+  $<HTMLInputElement>("exCredit").checked = exportOpts.credit;
+  $("exShapeHint").hidden = exportOpts.shape !== "vertical";
+}
+function setExportOpts(patch: Partial<typeof exportOpts>) {
+  exportOpts = { ...exportOpts, ...patch };
+  store.set("export", exportOpts);
+  syncExportOpts();
+  draw();
+}
+for (const b of $("exShape").querySelectorAll<HTMLButtonElement>("button"))
+  b.onclick = () => setExportOpts({ shape: b.dataset.v as typeof exportOpts.shape });
+$<HTMLInputElement>("exCredit").onchange = (e) => setExportOpts({ credit: (e.target as HTMLInputElement).checked });
+syncExportOpts();
+
+// ---------------------------------------------------------------- first run: walkthrough + sample clip
+const intro = $<HTMLDialogElement>("intro");
+function closeIntro() {
+  store.set("intro", { seen: true });
+  if (intro.open) intro.close();
+}
+async function loadSample() {
+  const have = clips.findIndex((c) => c.file.name === "flighted-sample.mp4");
+  if (have >= 0) return select(have);
+  try {
+    const b = await (await fetch(new URL("sample/flighted-sample.mp4", document.baseURI))).blob();
+    await addFiles([new File([b], "flighted-sample.mp4", { type: "video/mp4", lastModified: 1 })]);
+    select(clips.length - 1);
+    toast("Sample loaded. Step to the frame where the club hits the ball and tap the ball.", 5000);
+  } catch {
+    toast("Couldn't load the sample clip. Check your connection.");
+  }
+}
+$("introSample").onclick = () => {
+  closeIntro();
+  loadSample();
+};
+$("introAdd").onclick = () => {
+  closeIntro();
+  $("fileIn").click();
+};
+$("introSkip").onclick = closeIntro;
+intro.addEventListener("cancel", () => store.set("intro", { seen: true }));
+$("help").onclick = () => intro.showModal();
+$("sampleBtn").onclick = loadSample;
+if (!store.get("intro", { seen: false }).seen) intro.showModal();
+$("stReset").onclick = () => setStyle({ ...DEFAULT_STYLE });
+// on <user>.github.io/<repo>/ point the Source link at that repo, so forks link to themselves
+if (location.hostname.endsWith(".github.io")) {
+  const user = location.hostname.split(".")[0], repo = location.pathname.split("/")[1];
+  if (repo) $<HTMLAnchorElement>("srcLink").href = `https://github.com/${user}/${repo}`;
+}
+
 syncShell();
 
 // ---------------------------------------------------------------- kept clips (this device only, one hour)
-// dev only: ?keep=60 shortens the hour to 60 s for testing
+// dev only: ?keep=60 shortens the hour to 60 s for testing; ?nofilter draws the glow the way Safari without canvas filters does
 if (import.meta.env.DEV && new URLSearchParams(location.search).has("keep"))
   setKeepTime(+new URLSearchParams(location.search).get("keep")! * 1000);
+if (import.meta.env.DEV && new URLSearchParams(location.search).has("nofilter")) setCanvasFilterSupport(false);
 
 function dropClips(ids: string[], why: string) {
   let n = 0;
