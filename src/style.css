@@ -56,7 +56,8 @@ button, input, select { font: inherit; color: inherit; }
 .clip-list .x:hover { opacity: 1; color: var(--danger); }
 
 .center { min-width: 0; }
-.empty .drop { border: 2px dashed var(--line); border-radius: 14px; padding: 80px 20px; text-align: center; color: var(--mute); }
+.empty .drop { display: block; border: 2px dashed var(--line); border-radius: 14px; padding: 80px 20px; text-align: center; color: var(--mute); cursor: pointer; }
+.empty .drop:hover { border-color: #46524b; }
 .empty .big { font-size: 22px; color: var(--text); margin-bottom: 6px; }
 body.dragging .empty .drop, body.dragging .stage { outline: 2px dashed var(--accent); outline-offset: 4px; }
 
@@ -109,6 +110,60 @@ body.dragging .empty .drop, body.dragging .stage { outline: 2px dashed var(--acc
 .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: #000d; border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.on { opacity: 1; }
 
+.save { display: grid; gap: 6px; margin-top: 8px; }
+.save .nm { font-size: 12px; color: var(--mute); overflow-wrap: anywhere; }
+
 @media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; }
+  .layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* phones */
+@media (max-width: 640px) {
+  html, body { overflow-x: hidden; }
+  .top { padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); flex-wrap: wrap; gap: 2px 12px; }
+  .brand small { display: none; }
+  .privacy { font-size: 11px; }
+  .layout { gap: 8px; padding: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .panel { padding: 8px; }
+  .empty .drop { padding: 48px 16px; }
+
+  /* clip list becomes a horizontal strip */
+  .clips .panel-h, .clips .hint { display: none; }
+  .clips .btn.block { margin-top: 0; }
+  .clip-list { display: flex; overflow-x: auto; gap: 6px; margin-top: 8px; scrollbar-width: none; }
+  .clip-list:empty { display: none; }
+  .clip-list li { flex: 0 0 auto; max-width: 70vw; background: var(--panel2); border-color: var(--line); }
+  /* the video fills the width, so the ‹ › overlays would cover the ball: use the clip strip instead */
+  .nav { display: none; }
+
+  .steps { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .steps li { flex: 0 0 auto; }
+  .stage-wrap { max-height: none; }
+
+  .transport { flex-wrap: wrap; }
+  .transport input[type="range"] { order: -1; flex: 1 0 100%; }
+  .transport .btn { flex: 1; }
+  .tc { min-width: 0; flex: 1 0 100%; text-align: center; }
+  .actions .sp { display: none; }
+  .actions > .btn, .actions .seg { flex: 1 1 auto; }
+  .actions .seg .btn { flex: 1; }
+  .btn { white-space: normal; }
+  .row > .seg { flex: 1 1 100%; }
+  .row > .seg .btn { flex: 1; }
+}
+
+/* touch: 44 px tap targets, 16 px inputs (stops iOS zooming in on focus) */
+@media (pointer: coarse) {
+  .btn, .btn.sm, .presets .btn, .steps li, .clip-list li, .nav { min-height: 44px; }
+  .btn, .btn.sm, .presets .btn { min-width: 44px; padding: 8px 12px; font-size: 14px; }
+  .steps li { display: flex; align-items: center; padding: 0 14px; font-size: 13px; }
+  .clip-list .x { min-width: 44px; min-height: 44px; margin: -6px -8px -6px 0; font-size: 16px; opacity: .7; }
+  .seg { gap: 6px; }
+  input[type="range"] { min-height: 44px; }
+  input[type="checkbox"] { width: 22px; height: 22px; }
+  .row.chk { min-height: 44px; }
+  .row select, .num input, .hang-table input { font-size: 16px; min-height: 44px; }
+  .colors input[type="color"] { width: 52px; height: 44px; }
+  .side summary { padding: 12px 0; }
+  .nav { width: 44px; }
 }

@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1311" />
     <meta name="description" content="Free golf shot tracers in your browser. Upload a clip, tap the ball, peak and landing, download it with the tracer." />
     <title>Flighted</title>
   </head>
@@ -28,10 +29,10 @@
       <!-- stage -->
       <section class="center">
         <div id="empty" class="empty">
-          <div class="drop">
-            <div class="big">Drop golf clips here</div>
-            <div>or use <b>+ Add clips</b>. MP4 / MOV from your phone or camera.</div>
-          </div>
+          <label class="drop" for="fileIn">
+            <div class="big">Add golf clips</div>
+            <div>Tap to pick videos from your camera roll or files, or drop them here. MP4 / MOV from your phone or camera.</div>
+          </label>
         </div>
 
         <div id="work" class="work" hidden>
@@ -149,6 +150,7 @@
           <button id="exWebm" class="btn block">Overlay: transparent WebM</button>
           <button id="exAll" class="btn block">MP4s for all marked clips</button>
           <div id="exProg" class="prog" hidden><div class="bar"><i></i></div><span id="exMsg"></span><button id="exCancel" class="btn sm">Cancel</button></div>
+          <div id="exSave" class="save" hidden></div>
           <p class="hint">Overlays have no video, just the tracer on a transparent background, so you can put it on its own track in Premiere or Resolve.</p>
           <p id="exWarn" class="warn" hidden></p>
         </details>

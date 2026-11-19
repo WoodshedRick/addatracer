@@ -31,7 +31,8 @@ const clips: Clip[] = [];
 let cur = -1;
 let tool: Tool = "I";
 let view: "marks" | "tracer" = "marks";
-let drag: { key: Key; at: Pt } | null = null;
+/** marker being dragged; `off` keeps the marker where it was relative to the finger, so a finger never hides it */
+let drag: { key: Key; at: Pt; off: Pt } | null = null;
 let busy: AbortController | null = null;
 
 const store = {
@@ -173,8 +174,8 @@ function select(i: number, force = false) {
     "loadedmetadata",
     () => {
       layout();
-      if (c.impactFrame !== null) seekFrame(c.impactFrame);
-      else draw();
+      // seek even without an impact frame: iOS Safari shows a black frame until the first seek
+      seekFrame(c.impactFrame ?? 0);
     },
     { once: true },
   );
@@ -300,8 +301,8 @@ function draw() {
 
 /** magnifier in the corner away from the finger */
 function loupe(p: Pt, key: Key, k: number, dpr: number) {
-  const R = 90 * dpr, Z = 4, r = R / Z, [px, py] = [p[0] * k, p[1] * k];
-  const lx = px < cv.width / 2 ? cv.width - R - 12 * dpr : R + 12 * dpr, ly = R + 12 * dpr;
+  const R = Math.min(90 * dpr, cv.height * 0.3), Z = 4, r = R / Z, [px, py] = [p[0] * k, p[1] * k];
+  const m = Math.min(12 * dpr, R * 0.15), lx = px < cv.width / 2 ? cv.width - R - m : R + m, ly = R + m;
   cx.save();
   cx.beginPath();
   cx.arc(lx, ly, R, 0, Math.PI * 2);
@@ -434,8 +435,8 @@ function evVideoPt(e: PointerEvent): Pt {
 }
 
 /** existing marker under the pointer (so it can be dragged) */
-function hitMarker(c: Clip, p: Pt): Key | null {
-  const r = cv.getBoundingClientRect(), [W] = vidSize(), tol = (18 / r.width) * W;
+function hitMarker(c: Clip, p: Pt, touch = false): Key | null {
+  const r = cv.getBoundingClientRect(), [W] = vidSize(), tol = ((touch ? 30 : 18) / r.width) * W;
   let best: Key | null = null, bd = tol;
   for (const key of ["S", "M", "A", "N", "E", "R"] as Key[]) {
     const q = c.pts[key];
@@ -457,20 +458,23 @@ cv.addEventListener("pointerdown", (e) => {
     return;
   }
   const p = evVideoPt(e);
-  const hit = view === "marks" ? hitMarker(c, p) : null;
+  const hit = view === "marks" ? hitMarker(c, p, e.pointerType !== "mouse") : null;
   const key: Key = hit ?? (tool === "I" ? "S" : tool);
   if (view === "tracer") setView("marks");
   vid.pause();
   cv.setPointerCapture(e.pointerId);
   tool = key;
-  c.pts[key] = [Math.round(p[0]), Math.round(p[1])];
-  drag = { key, at: p };
+  // grabbing an existing marker moves it by the drag distance; a fresh tap puts it under the pointer
+  const q = hit ? c.pts[hit]! : p, off: Pt = [q[0] - p[0], q[1] - p[1]];
+  c.pts[key] = [Math.round(q[0]), Math.round(q[1])];
+  drag = { key, at: q, off };
   syncSteps();
   draw();
 });
 cv.addEventListener("pointermove", (e) => {
   if (!drag) return;
-  const p = evVideoPt(e), c = clip();
+  const [W, H] = vidSize(), e0 = evVideoPt(e), c = clip();
+  const p: Pt = [Math.max(0, Math.min(W, e0[0] + drag.off[0])), Math.max(0, Math.min(H, e0[1] + drag.off[1]))];
   c.pts[drag.key] = [Math.round(p[0]), Math.round(p[1])];
   drag.at = p;
   draw();
@@ -735,11 +739,46 @@ syncStyle();
 if (!webCodecsAvailable()) {
   const w = $("exWarn");
   w.hidden = false;
-  w.textContent = "This browser can't encode video, so only the PNG overlay will work. Use Chrome or Edge for MP4/WebM.";
+  w.textContent = "This browser can't encode video, so only the PNG overlay will work. Use Chrome or Edge (or Safari 17+ on iPhone) for MP4.";
+}
+
+// On phones a plain download goes to the Files app; the share sheet offers "Save Video" (camera roll). Sharing needs a
+// fresh tap, and an export takes a while, so finished files wait behind a button.
+const touchDevice = matchMedia("(pointer: coarse)").matches;
+const shareable = (f: File) => touchDevice && !!navigator.canShare?.({ files: [f] });
+function offerSave(files: File[]) {
+  const box = $("exSave");
+  box.replaceChildren(
+    ...files.flatMap((f) => {
+      const nm = document.createElement("div");
+      nm.className = "nm";
+      nm.textContent = f.name;
+      const share = document.createElement("button");
+      share.className = "btn primary block";
+      share.textContent = f.type.startsWith("video/") ? "Save video (Photos / share)" : "Save / share";
+      share.onclick = () =>
+        navigator.share({ files: [f] }).catch((e) => {
+          if (e?.name !== "AbortError") download(f, f.name);
+        });
+      const dl = document.createElement("button");
+      dl.className = "btn block";
+      dl.textContent = "Download to Files";
+      dl.onclick = () => download(f, f.name);
+      return [nm, share, dl];
+    }),
+  );
+  box.hidden = !files.length;
 }
 
 async function runExport(kind: "mp4" | "png" | "webm", list: Clip[]) {
   if (busy) return;
+  offerSave([]);
+  const ready: File[] = [];
+  const deliver = (blob: Blob, name: string) => {
+    const f = new File([blob], name, { type: blob.type });
+    if (shareable(f)) ready.push(f);
+    else download(blob, name);
+  };
   busy = new AbortController();
   const prog = $("exProg"), bar = prog.querySelector("i") as HTMLElement, msg = $("exMsg");
   prog.hidden = false;
@@ -755,12 +794,13 @@ async function runExport(kind: "mp4" | "png" | "webm", list: Clip[]) {
       onProgress(0);
       const job = { file: c.file, info, flight: flightOf(c)!, impactFrame: c.impactFrame!, style, onProgress, signal: busy.signal };
       const t0 = performance.now();
-      if (kind === "mp4") download(await exportBakedMp4(job), outName(c.file, "tracer.mp4"));
-      else if (kind === "png") download(await exportPngSequence(job), outName(c.file, "tracer_png.zip"));
-      else download(await exportAlphaWebm(job), outName(c.file, "tracer_alpha.webm"));
+      if (kind === "mp4") deliver(await exportBakedMp4(job), outName(c.file, "tracer.mp4"));
+      else if (kind === "png") deliver(await exportPngSequence(job), outName(c.file, "tracer_png.zip"));
+      else deliver(await exportAlphaWebm(job), outName(c.file, "tracer_alpha.webm"));
       console.info(`[flighted] ${kind} export of ${c.file.name} took ${((performance.now() - t0) / 1000).toFixed(1)} s`);
     }
-    toast(list.length > 1 ? `Exported ${list.length} clips` : "Export done: check your downloads");
+    offerSave(ready);
+    toast(ready.length ? "Export done: tap Save below" : list.length > 1 ? `Exported ${list.length} clips` : "Export done: check your downloads");
   } catch (e: any) {
     if (e?.name === "AbortError" || e?.name === "ConversionCanceledError") toast("Export canceled");
     else {
