@@ -5,12 +5,14 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0f1311" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-title" content="%APP_NAME%" />
     <meta name="description" content="Free golf shot tracers in your browser. Upload a clip, tap the ball, peak and landing, download it with the tracer." />
-    <title>Flighted</title>
+    <title>%APP_NAME%: free golf shot tracers</title>
   </head>
   <body>
     <header class="top">
-      <div class="brand"><span class="logo" aria-hidden="true"></span>Flighted <small>free golf shot tracers, right in your browser</small></div>
+      <div class="brand"><span class="logo" aria-hidden="true"></span>%APP_NAME% <small>free golf shot tracers, right in your browser</small></div>
       <div class="top-r">
         <span class="privacy">🔒 Your videos never leave your device. No account, no tracking.</span>
         <button id="help" class="btn sm" title="How it works">How it works</button>
@@ -130,7 +132,6 @@
             </div>
           </div>
           <p id="exShapeHint" class="hint" hidden>Vertical crops a 9:16 window around the shot (the shaded area won't be in the video) for Reels, TikTok and Shorts.</p>
-          <label class="row chk"><input id="exCredit" type="checkbox" /> Add a small "Made with Flighted" credit</label>
           <button id="exMp4" class="btn primary block">Download video</button>
           <button id="exAll" class="btn block">Download all marked clips</button>
           <div id="exProg" class="prog" hidden><div class="bar"><i></i></div><span id="exMsg"></span><button id="exCancel" class="btn sm">Cancel</button></div>
@@ -140,7 +141,7 @@
             <summary>Overlays for editing apps</summary>
             <button id="exPng" class="btn block">Overlay: PNG sequence (.zip)</button>
             <button id="exWebm" class="btn block">Overlay: transparent WebM</button>
-            <p class="hint">Just the tracer on a transparent background, original shape, no credit, so you can put it on its own track in Premiere, Resolve or CapCut.</p>
+            <p class="hint">Just the tracer on a transparent background, original shape, so you can put it on its own track in Premiere, Resolve or CapCut.</p>
           </details>
         </details>
 
@@ -188,10 +189,10 @@
     </main>
 
     <footer class="foot">
-      <span>Flighted is free, made by <b>Garrick Woods Golf</b>:</span>
+      <span>Free, made by <b>Garrick Woods Golf</b>:</span>
       <a href="https://www.youtube.com/@garrickwoodsgolf" target="_blank" rel="noopener">YouTube</a>
       <a href="https://www.instagram.com/garrickwoodsgolf/" target="_blank" rel="noopener">Instagram</a>
-      <a href="https://github.com/garrickwoods/flighted" target="_blank" rel="noopener" id="srcLink">Source</a>
+      <a href="https://github.com/garrickwoods/addatracer" target="_blank" rel="noopener" id="srcLink">Source</a>
     </footer>
 
     <dialog id="intro" class="intro" aria-labelledby="introH">

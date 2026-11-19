@@ -6,6 +6,7 @@ import { DEFAULT_STYLE, PRESETS, colAt, type TracerStyle } from "./tracer/style"
 import {
   download, exportAlphaWebm, exportBakedMp4, exportPngSequence, outName, probe, webCodecsAvailable, type ClipInfo,
 } from "./media";
+import { APP_ID } from "./app";
 import { forget, forgetAll, keepClip, keepTime, purgeExpired, restore, setKeepTime, touch } from "./keep";
 
 // ---------------------------------------------------------------- state
@@ -43,7 +44,7 @@ let busy: AbortController | null = null;
 const store = {
   get<T>(k: string, d: T): T {
     try {
-      const v = localStorage.getItem("flighted." + k);
+      const v = localStorage.getItem(`${APP_ID}.${k}`);
       return v ? { ...d, ...JSON.parse(v) } : d;
     } catch {
       return d;
@@ -51,7 +52,7 @@ const store = {
   },
   set(k: string, v: unknown) {
     try {
-      localStorage.setItem("flighted." + k, JSON.stringify(v));
+      localStorage.setItem(`${APP_ID}.${k}`, JSON.stringify(v));
     } catch {
       /* private mode etc. */
     }
@@ -59,7 +60,7 @@ const store = {
 };
 let style: TracerStyle = store.get("style", { ...DEFAULT_STYLE });
 let hangTable: Partial<Record<Club, number>> = store.get("hang", {});
-let exportOpts: { shape: "original" | "vertical"; credit: boolean } = store.get("export", { shape: "original", credit: true });
+let exportOpts: { shape: "original" | "vertical" } = store.get("export", { shape: "original" });
 
 // ---------------------------------------------------------------- dom
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -92,7 +93,7 @@ function save(c: Clip) {
 function purgeOldMarks(all = false) {
   try {
     for (const k of Object.keys(localStorage)) {
-      if (!k.startsWith("flighted.clip:")) continue;
+      if (!k.startsWith(`${APP_ID}.clip:`)) continue;
       let t = 0;
       try {
         t = JSON.parse(localStorage.getItem(k)!).t ?? 0;
@@ -872,13 +873,13 @@ async function runExport(kind: "mp4" | "png" | "webm", list: Clip[]) {
       const crop = kind === "mp4" ? cropFor(c, info.width, info.height) : undefined;
       const job = {
         file: c.file, info, flight: flightOf(c)!, impactFrame: c.impactFrame!, style, onProgress, signal: busy.signal,
-        crop, credit: kind === "mp4" && exportOpts.credit,
+        crop,
       };
       const t0 = performance.now();
       if (kind === "mp4") deliver(await exportBakedMp4(job), outName(c.file, crop ? "tracer_vertical.mp4" : "tracer.mp4"));
       else if (kind === "png") deliver(await exportPngSequence(job), outName(c.file, "tracer_png.zip"));
       else deliver(await exportAlphaWebm(job), outName(c.file, "tracer_alpha.webm"));
-      console.info(`[flighted] ${kind} export of ${c.file.name} took ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+      console.info(`[${APP_ID}] ${kind} export of ${c.file.name} took ${((performance.now() - t0) / 1000).toFixed(1)} s`);
     }
     offerSave(ready);
     toast(ready.length ? "Export done: tap Save below" : list.length > 1 ? `Exported ${list.length} clips` : "Export done: check your downloads");
@@ -902,7 +903,6 @@ $("exCancel").onclick = () => busy?.abort();
 
 function syncExportOpts() {
   for (const b of $("exShape").querySelectorAll<HTMLButtonElement>("button")) b.setAttribute("aria-pressed", String(b.dataset.v === exportOpts.shape));
-  $<HTMLInputElement>("exCredit").checked = exportOpts.credit;
   $("exShapeHint").hidden = exportOpts.shape !== "vertical";
 }
 function setExportOpts(patch: Partial<typeof exportOpts>) {
@@ -913,7 +913,6 @@ function setExportOpts(patch: Partial<typeof exportOpts>) {
 }
 for (const b of $("exShape").querySelectorAll<HTMLButtonElement>("button"))
   b.onclick = () => setExportOpts({ shape: b.dataset.v as typeof exportOpts.shape });
-$<HTMLInputElement>("exCredit").onchange = (e) => setExportOpts({ credit: (e.target as HTMLInputElement).checked });
 syncExportOpts();
 
 // ---------------------------------------------------------------- first run: walkthrough + sample clip
@@ -923,11 +922,11 @@ function closeIntro() {
   if (intro.open) intro.close();
 }
 async function loadSample() {
-  const have = clips.findIndex((c) => c.file.name === "flighted-sample.mp4");
+  const have = clips.findIndex((c) => c.file.name === "sample-clip.mp4");
   if (have >= 0) return select(have);
   try {
-    const b = await (await fetch(new URL("sample/flighted-sample.mp4", document.baseURI))).blob();
-    await addFiles([new File([b], "flighted-sample.mp4", { type: "video/mp4", lastModified: 1 })]);
+    const b = await (await fetch(new URL("sample/sample-clip.mp4", document.baseURI))).blob();
+    await addFiles([new File([b], "sample-clip.mp4", { type: "video/mp4", lastModified: 1 })]);
     select(clips.length - 1);
     toast("Sample loaded. Step to the frame where the club hits the ball and tap the ball.", 5000);
   } catch {
@@ -1015,4 +1014,4 @@ if (import.meta.env.DEV) {
 }
 
 // handy for debugging in the console
-(window as any).flighted = { clips, get style() { return style; }, addFiles };
+(window as any).app = { clips, get style() { return style; }, addFiles };

@@ -4,6 +4,8 @@
 // Everything here fails soft. Private browsing, a full disk, Safari evicting old data or a browser without IndexedDB
 // just means clips aren't kept after a refresh; the app keeps working.
 
+import { APP_ID } from "./app";
+
 export const KEEP_MS = 60 * 60 * 1000;
 let keepMs = KEEP_MS;
 export const keepTime = () => keepMs;
@@ -24,7 +26,7 @@ let dbp: Promise<IDBDatabase | null> | null = null;
 function db(): Promise<IDBDatabase | null> {
   return (dbp ??= new Promise((res) => {
     try {
-      const rq = indexedDB.open("flighted", 1);
+      const rq = indexedDB.open(APP_ID, 1);
       rq.onupgradeneeded = () => {
         rq.result.createObjectStore("meta", { keyPath: "id" });
         rq.result.createObjectStore("files");

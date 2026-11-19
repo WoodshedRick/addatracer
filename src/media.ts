@@ -9,6 +9,7 @@ import { encodePng } from "./png";
 import { drawTracer } from "./tracer/draw";
 import { tracerDuration, type Flight } from "./tracer/flight";
 import type { TracerStyle } from "./tracer/style";
+import { APP_NAME } from "./app";
 
 export interface ClipInfo {
   fps: number;
@@ -54,8 +55,6 @@ export interface ExportJob {
   style: TracerStyle;
   /** MP4 only: crop a full-height window starting at video x (vertical 9:16 export), output 1080×1920 */
   crop?: { x: number; w: number };
-  /** MP4 only: small "Made with Flighted" credit */
-  credit?: boolean;
   onProgress?: (p: number) => void;
   signal?: AbortSignal;
 }
@@ -64,22 +63,6 @@ const baseName = (f: File) => f.name.replace(/\.[^.]+$/, "");
 
 export function webCodecsAvailable(): boolean {
   return typeof VideoEncoder !== "undefined" && typeof VideoDecoder !== "undefined";
-}
-
-export const CREDIT = "Made with Flighted · @garrickwoodsgolf";
-
-/** The credit line, bottom-right (or, for vertical video, left and above where TikTok / Reels put their captions). */
-export function drawCredit(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, W: number, H: number) {
-  const vertical = H > W, fs = Math.max(12, Math.round(Math.min(W, H) * 0.024));
-  ctx.save();
-  ctx.font = `600 ${fs}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.textBaseline = "alphabetic";
-  ctx.textAlign = vertical ? "left" : "right";
-  ctx.shadowColor = "rgba(0,0,0,.6)";
-  ctx.shadowBlur = fs * 0.3;
-  ctx.fillStyle = "rgba(255,255,255,.85)";
-  ctx.fillText(CREDIT, vertical ? W * 0.06 : W - fs, vertical ? H * 0.7 : H - fs);
-  ctx.restore();
 }
 
 /** The clip with the tracer burned in, as MP4 (H.264 + original audio). */
@@ -120,7 +103,6 @@ export async function exportBakedMp4(job: ExportJob): Promise<Blob> {
           } else sample.drawWithFit(ctx, { fit: "fill" });
           // sample timestamps match the <video> element's clock (checked on an edit-listed MOV), so no firstTs shift
           drawTracer(ctx, flight, sample.timestamp - tImpact, style, vScale, k, [crop?.x ?? 0, 0]);
-          if (job.credit) drawCredit(ctx, OW, OH);
           return canvas;
         },
       },
@@ -156,7 +138,7 @@ export async function exportPngSequence(job: ExportJob): Promise<Blob> {
   const tc = timecode(impactFrame, info.fps);
   files[`${name}_tracer/HOW_TO_USE.txt`] = new TextEncoder().encode(
     [
-      `Flighted tracer overlay for ${file.name}`,
+      `${APP_NAME} tracer overlay for ${file.name}`,
       ``,
       `${n} transparent PNG frames at ${info.fps.toFixed(3)} fps, ${W}x${H}.`,
       `Frame 00000 is the impact frame: frame ${impactFrame} of the original clip (${tc} from the clip start).`,

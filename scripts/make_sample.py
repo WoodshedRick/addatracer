@@ -1,4 +1,4 @@
-"""Generate the practice clip (public/sample/flighted-sample.mp4): a stylised tripod shot of a drive, drawn from scratch,
+"""Generate the practice clip (public/sample/sample-clip.mp4): a stylised tripod shot of a drive, drawn from scratch,
 so the walkthrough has something to mark without using anyone's real footage.
 
     python scripts/make_sample.py [path/to/ffmpeg]
@@ -28,7 +28,7 @@ HORIZON = 335
 BALL0 = tuple(PATH[0][:2])
 LAND = tuple(PATH[-1][:2])
 FLAG = (884, 366)
-OUT = HERE.parent / "public" / "sample" / "flighted-sample.mp4"
+OUT = HERE.parent / "public" / "sample" / "sample-clip.mp4"
 
 
 def lerp(a, b, u):
@@ -126,7 +126,7 @@ def main():
     proc = subprocess.Popen(
         [ffmpeg, "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS),
          "-i", "-", "-c:v", "libx264", "-preset", "slow", "-crf", "23", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-         "-metadata", "title=Flighted sample clip (generated)", str(OUT)],
+         "-metadata", "title=Sample clip (generated)", str(OUT)],
         stdin=subprocess.PIPE,
     )
     for f in range(N):
@@ -141,7 +141,7 @@ def main():
         im.paste((255, 255, 255), mask=glow.filter(ImageFilter.GaussianBlur(br * SS)))
         d.ellipse([(bx - br) * SS, (by - br) * SS, (bx + br) * SS, (by + br) * SS], fill=(252, 252, 250))
         frame = im.resize((W, H), Image.LANCZOS)
-        ImageDraw.Draw(frame).text((W - 150, H - 26), "Flighted sample clip", fill=(255, 255, 255))
+        ImageDraw.Draw(frame).text((W - 96, H - 26), "Sample clip", fill=(255, 255, 255))
         proc.stdin.write(frame.tobytes())
     proc.stdin.close()
     if proc.wait():

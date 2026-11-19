@@ -1,4 +1,4 @@
-# Flighted
+# Add a Tracer
 
 Free golf shot tracers, right in your browser. Add a clip, tap the ball, the peak and where it lands, and download
 it with the tracer burned in, in the original shape or vertical 9:16 for Reels, TikTok and Shorts. No account, no
@@ -7,7 +7,7 @@ subscription, no AI, and your videos never leave your device.
 Made by **Garrick Woods Golf** ([YouTube](https://www.youtube.com/@garrickwoodsgolf),
 [Instagram](https://www.instagram.com/garrickwoodsgolf/)).
 
-![Flighted comet tracer](public/favicon.svg)
+![Comet tracer](public/favicon.svg)
 
 ## Privacy
 
@@ -49,9 +49,8 @@ footage.
   - *Download video*: MP4 (H.264), original frame rate and audio (camera PCM audio is converted to AAC).
     - **Original** shape at the original resolution, or
     - **Vertical 9:16** at 1080×1920: a full-height window around the shot (the preview shades what's cut off).
-    - A small *Made with Flighted · @garrickwoodsgolf* credit is on by default; untick it to leave it off.
   - *Download all marked clips*: batch export.
-  - *Overlays for editing apps* (no credit, original shape):
+  - *Overlays for editing apps* (original shape):
     - *PNG sequence (.zip)*: transparent frames starting on the impact frame, plus a `HOW_TO_USE.txt` with the exact
       start frame. In Premiere: Import → first PNG → tick *Image Sequence*.
     - *Transparent WebM* (VP9 + alpha): full clip length, so it lines up when placed above the clip.
@@ -86,6 +85,10 @@ Dev tips (dev server only, stripped from builds):
 Rebuild the sample clip with `python scripts/make_sample.py path/to/ffmpeg` (numpy, Pillow, ffmpeg with libx264).
 
 Every push to `main`/`master` runs the tests, builds and deploys to GitHub Pages (`.github/workflows/pages.yml`).
+
+- **Rename:** the name lives in `src/app.ts` (also fills in `index.html`), `public/manifest.webmanifest` and this README.
+- **Custom domain** (e.g. addatracer.com): add a `public/CNAME` file containing the domain, then set it under the
+  repo's *Settings → Pages*. The Vite `base` is relative, so nothing else changes.
 
 ### Layout
 
@@ -129,7 +132,7 @@ Not built, just the plan if it's ever needed.
 
 ## License
 
-Flighted is **source-available, not open source**. It's licensed under the
+Add a Tracer is **source-available, not open source**. It's licensed under the
 [PolyForm Noncommercial License 1.0.0](LICENSE)
 (Required Notice: Copyright (c) 2026 Garrick Woods Golf).
 
