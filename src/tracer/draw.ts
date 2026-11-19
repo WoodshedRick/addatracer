@@ -1,5 +1,6 @@
 // Canvas 2D drawing of the comet / line tracer. Used for both the live preview and the export,
-// so what you see is what you get. Coordinates are video pixels; `scale` = video height / 1080.
+// so what you see is what you get. Flight coordinates are video pixels; `videoScale` = video height / 1080
+// (sizes are designed at 1080p) and `k` = canvas px per video px (1 for export, smaller for an on-screen preview).
 
 import { cometAt, headRadius, lineAt, type Flight } from "./flight";
 import type { Pt } from "./path";
@@ -21,16 +22,19 @@ function offscreen(w: number, h: number): OffscreenCanvas {
 const rgba = (c: number[], a: number) => `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`;
 
 /** Draw the tracer for time t (seconds after impact). Returns false when nothing is on screen. */
-export function drawTracer(ctx: Ctx, F: Flight, t: number, style: TracerStyle, scale = 1): boolean {
-  if (style.type === "line") return drawLine(ctx, F, t, style, scale);
-  return drawComet(ctx, F, t, style, scale);
+export function drawTracer(ctx: Ctx, F: Flight, t: number, style: TracerStyle, videoScale = 1, k = 1): boolean {
+  if (style.type === "line") return drawLine(ctx, F, t, style, videoScale, k);
+  return drawComet(ctx, F, t, style, videoScale, k);
 }
 
-function drawComet(ctx: Ctx, F: Flight, t: number, s: TracerStyle, scale: number): boolean {
-  const c = cometAt(F, t, { tail: s.tailSec, scale });
+const toView = (pts: Pt[], k: number): Pt[] => (k === 1 ? pts : pts.map((p) => [p[0] * k, p[1] * k]));
+
+function drawComet(ctx: Ctx, F: Flight, t: number, s: TracerStyle, videoScale: number, k: number): boolean {
+  const c = cometAt(F, t, { tail: s.tailSec, scale: videoScale });
   if (!c.visible || c.pts.length < 2) return false;
+  const scale = videoScale * k;
   const rh = headRadius(c.headX) * s.cometSize * scale;
-  const pts = c.pts, n = pts.length, head = pts[n - 1], hc = colAt(s, 1);
+  const pts = toView(c.pts, k), n = pts.length, head = pts[n - 1], hc = colAt(s, 1);
   const W = ctx.canvas.width, H = ctx.canvas.height;
   ctx.save();
   ctx.globalAlpha = c.alpha;
@@ -122,22 +126,22 @@ function strokeGradientPath(ctx: Ctx, pts: Pt[], s: TracerStyle, width: number, 
   }
 }
 
-function drawLine(ctx: Ctx, F: Flight, t: number, s: TracerStyle, scale: number): boolean {
+function drawLine(ctx: Ctx, F: Flight, t: number, s: TracerStyle, videoScale: number, k: number): boolean {
   const c = lineAt(F, t, { hold: s.hold });
   if (!c.visible || c.pts.length < 2) return false;
-  const w = Math.max(1, s.lineWidth * scale);
+  const w = Math.max(1, s.lineWidth * videoScale * k), pts = toView(c.pts, k);
   const W = ctx.canvas.width, H = ctx.canvas.height;
   ctx.save();
   ctx.globalAlpha = c.alpha;
   if (s.glow && s.glowStrength > 0) {
     const off = offscreen(W, H), o = off.getContext("2d")!;
     o.clearRect(0, 0, W, H);
-    strokeGradientPath(o, c.pts, s, w * 3.2, Math.min(1, 0.85 * s.glowStrength), false);
+    strokeGradientPath(o, pts, s, w * 3.2, Math.min(1, 0.85 * s.glowStrength), false);
     ctx.filter = `blur(${(w * 1.6 * Math.min(1.6, s.glowStrength)).toFixed(1)}px)`;
     ctx.drawImage(off, 0, 0);
     ctx.filter = "none";
   }
-  strokeGradientPath(ctx, c.pts, s, w, 1, s.core && s.glow);
+  strokeGradientPath(ctx, pts, s, w, 1, s.core && s.glow);
   ctx.restore();
   return true;
 }

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Free golf shot tracers in your browser. Upload a clip, tap the ball, peak and landing, download it with the tracer." />
+    <title>Flighted</title>
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand"><span class="logo" aria-hidden="true"></span>Flighted <small>free golf shot tracers, right in your browser</small></div>
+      <div class="privacy">Your clips never leave this computer.</div>
+    </header>
+
+    <main class="layout">
+      <!-- clips -->
+      <aside class="panel clips">
+        <div class="panel-h">Clips</div>
+        <label class="btn primary block">
+          + Add clips
+          <input id="fileIn" type="file" accept="video/*,.mov,.mp4,.m4v,.webm" multiple hidden />
+        </label>
+        <ol id="clipList" class="clip-list"></ol>
+        <p class="hint">Tripod / still-camera shots work best for now.</p>
+      </aside>
+
+      <!-- stage -->
+      <section class="center">
+        <div id="empty" class="empty">
+          <div class="drop">
+            <div class="big">Drop golf clips here</div>
+            <div>or use <b>+ Add clips</b>. MP4 / MOV from your phone or camera.</div>
+          </div>
+        </div>
+
+        <div id="work" class="work" hidden>
+          <ol id="steps" class="steps"></ol>
+          <div id="instr" class="instr"></div>
+
+          <div id="stageWrap" class="stage-wrap">
+            <button id="prevClip" class="nav prev" title="Previous clip ([)" aria-label="Previous clip">‹</button>
+            <div id="stage" class="stage">
+              <video id="vid" playsinline muted preload="auto"></video>
+              <canvas id="cv"></canvas>
+            </div>
+            <button id="nextClip" class="nav next" title="Next clip (])" aria-label="Next clip">›</button>
+          </div>
+
+          <div class="transport">
+            <button id="fBack" class="btn" title="Back 1 frame (←)">−1f</button>
+            <button id="play" class="btn wide" title="Play / pause (space)">▶ Play</button>
+            <button id="fFwd" class="btn" title="Forward 1 frame (→)">+1f</button>
+            <button id="slow" class="btn" aria-pressed="false" title="Quarter speed">¼×</button>
+            <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Scrub" />
+            <span id="tc" class="tc">frame 0</span>
+          </div>
+
+          <div class="actions">
+            <button id="setImpact" class="btn impact">Set impact frame here</button>
+            <button id="goImpact" class="btn">Go to impact</button>
+            <span class="sp"></span>
+            <div class="seg" role="group" aria-label="View">
+              <button id="viewMarks" class="btn" aria-pressed="true">Marks</button>
+              <button id="viewTracer" class="btn" aria-pressed="false">Tracer</button>
+            </div>
+            <button id="preview" class="btn primary">▶ Preview shot</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- shot + style + export -->
+      <aside class="panel side" id="side" hidden>
+        <details open>
+          <summary>Shot</summary>
+          <label class="row">Club
+            <select id="club"></select>
+          </label>
+          <div class="row">Shape
+            <div class="seg" id="shape" role="group" aria-label="Shot shape">
+              <button data-v="auto" class="btn">Auto</button>
+              <button data-v="straight" class="btn">Straight</button>
+              <button data-v="fade" class="btn">Fade</button>
+              <button data-v="draw" class="btn">Draw</button>
+            </div>
+          </div>
+          <div id="shapeWarn" class="warn" hidden></div>
+          <label class="row">Flight time
+            <span class="num"><input id="hang" type="number" min="0.5" max="12" step="0.1" /> s</span>
+            <button id="hangReset" class="btn sm" title="Back to the club's default">club</button>
+          </label>
+          <label class="row chk"><input id="rico" type="checkbox" /> Ricochet / kick after landing</label>
+          <div class="row tools">Tap
+            <div class="seg wrap" id="tools" role="group" aria-label="Mark tool">
+              <button data-k="S" class="btn">Ball</button>
+              <button data-k="M" class="btn">Bend 1</button>
+              <button data-k="A" class="btn">Peak</button>
+              <button data-k="N" class="btn">Bend 2</button>
+              <button data-k="E" class="btn">Landing</button>
+              <button data-k="R" class="btn">Ricochet</button>
+            </div>
+          </div>
+          <div class="row">
+            <button id="clearBend" class="btn sm">Remove bends</button>
+            <button id="clearMarks" class="btn sm danger">Clear marks</button>
+          </div>
+        </details>
+
+        <details open>
+          <summary>Style</summary>
+          <div class="presets" id="presets"></div>
+          <div class="row">Type
+            <div class="seg" id="stType" role="group" aria-label="Tracer type">
+              <button data-v="comet" class="btn">Comet</button>
+              <button data-v="line" class="btn">Line</button>
+            </div>
+          </div>
+          <div class="row colors">
+            <label>Head <input id="stHead" type="color" /></label>
+            <label>Tail <input id="stTail" type="color" /></label>
+            <button id="stSwap" class="btn sm" title="Swap colors">⇄</button>
+          </div>
+          <label class="row">Blend point <input id="stMid" type="range" min="5" max="95" /> <output id="stMidV"></output></label>
+          <div class="row">Finish
+            <div class="seg" id="stGlow" role="group" aria-label="Finish">
+              <button data-v="glow" class="btn">Glow</button>
+              <button data-v="solid" class="btn">Solid</button>
+            </div>
+          </div>
+          <label class="row" id="rowGlow">Glow strength <input id="stGlowS" type="range" min="0.2" max="2" step="0.05" /> <output id="stGlowV"></output></label>
+          <label class="row chk"><input id="stCore" type="checkbox" /> White-hot core</label>
+          <label class="row" id="rowSize">Comet size <input id="stSize" type="range" min="0.4" max="2.5" step="0.05" /> <output id="stSizeV"></output></label>
+          <label class="row" id="rowTail">Tail length <input id="stTailSec" type="range" min="0.15" max="1.2" step="0.05" /> <output id="stTailV"></output></label>
+          <label class="row" id="rowWidth">Line thickness <input id="stWidth" type="range" min="1" max="16" step="0.5" /> <output id="stWidthV"></output></label>
+          <label class="row" id="rowHold">Hold after landing <input id="stHold" type="range" min="0" max="4" step="0.1" /> <output id="stHoldV"></output></label>
+          <p class="hint">Style applies to every clip.</p>
+        </details>
+
+        <details>
+          <summary>Club flight times</summary>
+          <div id="hangTable" class="hang-table"></div>
+          <button id="hangTableReset" class="btn sm">Reset to defaults</button>
+        </details>
+
+        <details open>
+          <summary>Export</summary>
+          <button id="exMp4" class="btn primary block">Download MP4 with tracer</button>
+          <button id="exPng" class="btn block">Overlay: PNG sequence (.zip)</button>
+          <button id="exWebm" class="btn block">Overlay: transparent WebM</button>
+          <button id="exAll" class="btn block">MP4s for all marked clips</button>
+          <div id="exProg" class="prog" hidden><div class="bar"><i></i></div><span id="exMsg"></span><button id="exCancel" class="btn sm">Cancel</button></div>
+          <p class="hint">Overlays have no video, just the tracer on a transparent background, so you can put it on its own track in Premiere or Resolve.</p>
+          <p id="exWarn" class="warn" hidden></p>
+        </details>
+      </aside>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

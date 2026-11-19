@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 _unrelated_session_files/
+
+# local test clips (not for the repo)
+public/_local/
