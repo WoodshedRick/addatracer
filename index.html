@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0f1311" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-title" content="%APP_NAME%" />
@@ -69,20 +69,26 @@
           </div>
 
           <div class="actions">
-            <button id="setImpact" class="btn impact">Set impact frame here</button>
+            <button id="setImpact" class="btn impact"><span class="lg">Set impact frame here</span><span class="sh">Set impact</span></button>
             <button id="goImpact" class="btn">Go to impact</button>
             <span class="sp"></span>
             <div class="seg" role="group" aria-label="View">
               <button id="viewMarks" class="btn" aria-pressed="true">Marks</button>
               <button id="viewTracer" class="btn" aria-pressed="false">Tracer</button>
             </div>
-            <button id="preview" class="btn primary">▶ Preview shot</button>
+            <button id="preview" class="btn primary">▶ Preview<span class="lg"> shot</span></button>
+            <button id="openShot" class="btn phone-only" aria-controls="side">⚙ Options</button>
+            <button id="openDl" class="btn phone-only" aria-controls="side">⬇ Download</button>
           </div>
         </div>
       </section>
 
       <!-- shot + style + export -->
-      <aside class="panel side" id="side" hidden>
+      <aside class="panel side" id="side" hidden aria-label="Shot, style and download">
+        <div class="sheet-h phone-only">
+          <b>Shot, style and download</b>
+          <button id="sheetClose" class="btn" aria-label="Close">✕</button>
+        </div>
         <details open>
           <summary>Shot</summary>
           <label class="row">Club
@@ -185,9 +191,14 @@
           <button id="hangTableReset" class="btn sm">Reset to defaults</button>
         </details>
 
+        <div class="phone-only sheet-clear">
+          <button id="clearAll2" class="btn sm block">Clear all clips now</button>
+        </div>
+
       </aside>
     </main>
 
+    <div id="sheetBg" class="sheet-bg" hidden></div>
     <footer class="foot">
       <span>Free, made by <b>Garrick Woods Golf</b>:</span>
       <a href="https://www.youtube.com/@garrickwoodsgolf" target="_blank" rel="noopener">YouTube</a>

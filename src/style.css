@@ -187,3 +187,67 @@ details.sub[open] > summary { margin-bottom: 4px; }
   .side summary { padding: 12px 0; }
   .nav { width: 44px; }
 }
+
+/* ------------------------------------------------------------------ no page zoom
+   touch-action: manipulation turns off double-tap zoom (tapping −1f / +1f quickly zoomed the page on iPhone) */
+button, .btn, a, label, summary, select, input, .steps li, .clip-list li { touch-action: manipulation; }
+.stage, .stage canvas { touch-action: none; }
+.phone-only, .sh { display: none; }
+.sheet-bg { position: fixed; inset: 0; z-index: 20; background: #0008; }
+
+/* ------------------------------------------------------------------ phone editor: one screen, no page scroll */
+@media (max-width: 640px) {
+  input, select, textarea { font-size: 16px; } /* below 16 px iOS zooms in on focus */
+  .phone-only { display: revert; }
+  .lg { display: none; }
+  .sh { display: inline; }
+
+  html:has(body.editing), body.editing { height: 100dvh; overflow: hidden; overscroll-behavior: none; }
+  body.editing { display: flex; flex-direction: column; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+  body.editing .top { flex: none; padding-top: 6px; padding-bottom: 6px; flex-wrap: nowrap; }
+  body.editing .privacy, body.editing .foot { display: none; }
+  body.editing .top-r { flex: none; }
+  body.editing .brand { font-size: 16px; }
+
+  body.editing .layout { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 6px 10px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+
+  /* clips: one row, + Add then the clip strip */
+  body.editing .clips { flex: none; display: flex; align-items: center; gap: 6px; padding: 0; background: none; border: 0; }
+  body.editing .clips > .btn.block { width: auto; flex: none; margin: 0; padding: 0 12px; display: flex; align-items: center; }
+  body.editing .clips .hint, body.editing #clearAll { display: none; }
+  body.editing .clip-list { flex: 1; min-width: 0; margin: 0; }
+  body.editing .clip-list li { padding: 3px 4px 3px 8px; gap: 0 6px; max-width: 62vw; min-height: 44px; line-height: 1.2; align-content: center; }
+  body.editing .clip-list .nm { font-size: 12px; max-width: 34vw; flex: 0 1 auto; }
+  body.editing .clip-list .st { font-size: 10px; }
+  body.editing .clip-list .kp { font-size: 10px; }
+  body.editing .clip-list .x { min-width: 32px; min-height: 32px; margin: 0; }
+
+  body.editing .center, body.editing .work { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  body.editing .steps { flex: none; margin: 0 0 4px; gap: 4px; }
+  body.editing .steps li { min-height: 32px; padding: 0 10px; font-size: 12px; display: flex; align-items: center; }
+  body.editing .instr { flex: none; font-size: 12.5px; line-height: 1.3; min-height: 2.6em; margin-bottom: 4px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* the clip takes what's left, never more than ~45% of the screen, centred, aspect kept by layout() */
+  body.editing .stage-wrap { flex: 0 1 auto; min-height: 120px; max-height: 45dvh; }
+
+  body.editing .transport { flex: none; flex-wrap: wrap; gap: 4px 6px; margin-top: 4px; }
+  body.editing .transport input[type="range"] { min-height: 30px; margin: 0; }
+  body.editing .transport .btn { flex: 1 1 0; padding: 0 4px; min-height: 44px; }
+  body.editing .tc { flex: 0 0 auto; min-width: 58px; font-size: 12px; text-align: center; }
+
+  body.editing .actions { flex: none; flex-wrap: nowrap; gap: 6px; margin-top: auto; padding-top: 6px; }
+  body.editing .actions .seg, body.editing #goImpact { display: none; }
+  body.editing .actions > .btn { flex: 1 1 0; min-width: 0; padding: 0 4px; font-size: 13px; line-height: 1.15; min-height: 44px; }
+
+  /* shot, style and download: a bottom sheet that scrolls on its own */
+  body.editing .side { position: fixed; z-index: 21; left: 0; right: 0; bottom: 0; max-height: 82dvh; overflow-y: auto;
+    overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border-radius: 14px 14px 0 0; border-bottom: 0;
+    padding: 0 14px max(14px, env(safe-area-inset-bottom)); transform: translateY(105%); transition: transform .22s ease;
+    box-shadow: 0 -8px 30px #000a; }
+  body.editing .side.open { transform: none; }
+  .sheet-h { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel); padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .sheet-clear { padding-top: 8px; }
+  body.editing .side > details { scroll-margin-top: 64px; }
+}

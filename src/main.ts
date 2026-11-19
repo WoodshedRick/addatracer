@@ -258,7 +258,36 @@ function syncShell() {
   $("empty").hidden = has;
   $("work").hidden = !has;
   $("side").hidden = !has;
+  document.body.classList.toggle("editing", has); // phones: one fixed screen, settings in a sheet
+  if (!has) closeSheet();
 }
+
+// ---------------------------------------------------------------- phone settings sheet
+const phone = matchMedia("(max-width: 640px)");
+function openSheet(section: "shot" | "download") {
+  const side = $("side");
+  side.classList.add("open");
+  $("sheetBg").hidden = false;
+  const d = side.querySelectorAll<HTMLDetailsElement>(":scope > details")[section === "shot" ? 0 : 1];
+  d.open = true;
+  side.scrollTop = 0;
+  if (section === "download") d.scrollIntoView({ block: "start" });
+}
+function closeSheet() {
+  $("side").classList.remove("open");
+  $("sheetBg").hidden = true;
+}
+$("openShot").onclick = () => openSheet("shot");
+$("openDl").onclick = () => openSheet("download");
+$("sheetClose").onclick = closeSheet;
+$("sheetBg").onclick = closeSheet;
+phone.addEventListener("change", () => !phone.matches && closeSheet());
+
+// No page zoom while editing: double-tap zoom is off via CSS touch-action; these catch iOS Safari's pinch, which can
+// ignore user-scalable=no.
+for (const ev of ["gesturestart", "gesturechange"]) document.addEventListener(ev, (e) => e.preventDefault());
+document.addEventListener("touchmove", (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+$("work").addEventListener("dblclick", (e) => e.preventDefault());
 
 // ---------------------------------------------------------------- layout
 function vidSize(): [number, number] {
@@ -437,11 +466,11 @@ const STEPS: { k: Tool; opt?: boolean }[] = [
   { k: "I" }, { k: "S" }, { k: "M", opt: true }, { k: "A" }, { k: "N", opt: true }, { k: "E" }, { k: "R", opt: true },
 ];
 const INSTR: Record<Tool, string> = {
-  I: "Play or scrub to the frame where the club hits the ball (<b>−1f / +1f</b> step one frame), pause, then <b>tap the ball</b>.",
-  S: "Tap the <b>ball</b> on the impact frame. Drag to fine-tune; the magnifier helps.",
-  M: "Optional <b>bend 1</b>: scrub forward and tap a point the ball passes through on the way up.",
+  I: "Scrub or step (<b>−1f / +1f</b>) to the frame where the club hits the ball, then <b>tap the ball</b>.",
+  S: "Tap the <b>ball</b> on the impact frame. Drag to fine-tune.",
+  M: "Optional <b>bend 1</b>: tap a point the ball passes on the way up.",
   A: "Scrub forward to the ball's <b>highest point</b> and tap it.",
-  N: "Optional <b>bend 2</b>: tap a point the ball passes through on the way down.",
+  N: "Optional <b>bend 2</b>: tap a point the ball passes on the way down.",
   E: "Scrub to where the ball <b>lands</b> and tap it.",
   R: "Tap where the ball ends up after it <b>kicks</b>.",
 };
@@ -454,19 +483,23 @@ function syncSteps() {
     ...STEPS.filter((s) => s.k !== "R" || c.ricochet).map((s) => {
       const li = document.createElement("li");
       const done = s.k === "I" ? c.impactFrame !== null : !!c.pts[s.k as Key];
-      li.textContent = NAMES[s.k] + (s.opt && s.k !== "R" ? " (optional)" : "");
+      li.innerHTML = NAMES[s.k] + (s.opt && s.k !== "R" ? '<span class="lg"> (optional)</span>' : "");
+      if (s.opt) li.title = "Optional";
       li.className = [s.opt ? "opt" : "", done ? "done" : "", tool === s.k ? "cur" : ""].join(" ");
       li.style.setProperty("--k", COL[s.k]);
-      li.onclick = () => setTool(s.k);
+      // the Impact chip also jumps back to the impact frame once it's set (phones hide "Go to impact")
+      li.onclick = () => (s.k === "I" && c.impactFrame !== null ? (setTool("I"), seekFrame(c.impactFrame)) : setTool(s.k));
       return li;
     }),
   );
   const instr = $("instr");
   instr.innerHTML = complete(c) && (view === "tracer" || tool === "E" || tool === "R" || tool === "S")
-    ? "All marked. Press <b>▶ Preview shot</b>, tweak the style, then export. Drag a marker in <b>Marks</b> view to adjust it."
+    ? "All marked. Press <b>▶ Preview</b>, then <b>Download</b>. Drag a marker to adjust it."
     : INSTR[tool];
   instr.style.setProperty("--k", COL[tool]);
-  ($("setImpact") as HTMLButtonElement).textContent = c.impactFrame === null ? "Set impact frame here" : "Move impact to this frame";
+  $("setImpact").innerHTML = c.impactFrame === null
+    ? '<span class="lg">Set impact frame here</span><span class="sh">Set impact</span>'
+    : '<span class="lg">Move impact to this frame</span><span class="sh">Move impact</span>';
   ($("goImpact") as HTMLButtonElement).disabled = c.impactFrame === null;
   ($("preview") as HTMLButtonElement).disabled = !complete(c);
   $("viewMarks").setAttribute("aria-pressed", String(view === "marks"));
@@ -479,6 +512,8 @@ function syncSteps() {
   const ok = complete(c);
   for (const id of ["exMp4", "exPng", "exWebm"]) ($(id) as HTMLButtonElement).disabled = !ok || !!busy;
   ($("exAll") as HTMLButtonElement).disabled = !clips.some(complete) || !!busy;
+  $("openDl").classList.toggle("primary", ok);
+  $("preview").classList.toggle("primary", ok && view !== "tracer");
 }
 
 function setTool(t: Tool) {
@@ -980,6 +1015,7 @@ async function expireTick() {
 }
 setInterval(expireTick, 20_000);
 
+$("clearAll2").onclick = () => $("clearAll").click();
 $("clearAll").onclick = async () => {
   if (!confirm("Remove every clip from this page and delete the copies kept on this device?")) return;
   await forgetAll();
