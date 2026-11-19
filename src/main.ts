@@ -6,6 +6,7 @@ import { DEFAULT_STYLE, PRESETS, colAt, type TracerStyle } from "./tracer/style"
 import {
   download, exportAlphaWebm, exportBakedMp4, exportPngSequence, outName, probe, webCodecsAvailable, type ClipInfo,
 } from "./media";
+import { forget, forgetAll, keepClip, keepTime, purgeExpired, restore, setKeepTime, touch } from "./keep";
 
 // ---------------------------------------------------------------- state
 type Key = "S" | "M" | "A" | "N" | "E" | "R";
@@ -22,6 +23,10 @@ interface Clip {
   shape: Shape;
   club: Club;
   hang: number | null;
+  /** when the copy kept on this device is deleted (null: not kept) */
+  keptUntil: number | null;
+  /** why it couldn't be kept */
+  keepNote?: string;
 }
 
 const COL: Record<Tool, string> = { I: "#ff7a2a", S: "#ffffff", M: "#7dffb0", A: "#ffc93c", N: "#7dffb0", E: "#36d1ff", R: "#c78bff" };
@@ -73,7 +78,31 @@ const fps = () => clip()?.info?.fps ?? 30;
 const keyOf = (f: File) => `clip:${f.name}|${f.size}|${f.lastModified}`;
 
 function save(c: Clip) {
-  store.set(keyOf(c.file), { impactFrame: c.impactFrame, pts: c.pts, ricochet: c.ricochet, shape: c.shape, club: c.club, hang: c.hang });
+  store.set(keyOf(c.file), { impactFrame: c.impactFrame, pts: c.pts, ricochet: c.ricochet, shape: c.shape, club: c.club, hang: c.hang, t: Date.now() });
+  // each change restarts the clip's hour on this device
+  if (c.keptUntil !== null)
+    touch(c.id).then((t) => {
+      if (t !== null) c.keptUntil = t + keepTime();
+      renderList();
+    });
+}
+
+/** marks are kept for the same hour as the clips */
+function purgeOldMarks(all = false) {
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (!k.startsWith("flighted.clip:")) continue;
+      let t = 0;
+      try {
+        t = JSON.parse(localStorage.getItem(k)!).t ?? 0;
+      } catch {
+        /* unreadable: drop it */
+      }
+      if (all || Date.now() - t >= keepTime()) localStorage.removeItem(k);
+    }
+  } catch {
+    /* storage blocked */
+  }
 }
 
 function complete(c: Clip): boolean {
@@ -100,15 +129,31 @@ function flightOf(c: Clip): Flight | null {
 async function addFiles(files: FileList | File[]) {
   const vids = [...files].filter((f) => f.type.startsWith("video/") || /\.(mov|mp4|m4v|webm|mkv)$/i.test(f.name));
   if (!vids.length) return toast("Those don't look like video files.");
-  const first = clips.length;
-  for (const f of vids) {
+  addClips(vids.map((file) => ({ file })));
+}
+
+/** `id` + `savedAt` for clips restored from this device, none for new uploads (which get stored) */
+function addClips(items: { file: File; id?: string; savedAt?: number }[]) {
+  const vids = items.map((i) => i.file), first = clips.length;
+  for (const { file: f, id, savedAt } of items) {
     const saved = store.get<Partial<Clip>>(keyOf(f), {});
     const c: Clip = {
-      id: crypto.randomUUID(), file: f, url: URL.createObjectURL(f), info: null,
+      id: id ?? crypto.randomUUID(), file: f, url: URL.createObjectURL(f), info: null,
       impactFrame: saved.impactFrame ?? null, pts: saved.pts ?? {}, ricochet: saved.ricochet ?? false,
       shape: saved.shape ?? "auto", club: saved.club ?? "driver", hang: saved.hang ?? null,
+      keptUntil: savedAt !== undefined ? savedAt + keepTime() : null,
     };
     clips.push(c);
+    if (!id)
+      keepClip(c.id, f).then((r) => {
+        if (!clips.includes(c)) return void forget(c.id); // removed while it was being stored
+        if (r.ok) c.keptUntil = r.savedAt + keepTime();
+        else {
+          c.keepNote = r.reason;
+          toast(`${f.name} won't survive a refresh: ${r.reason}.`, 5000);
+        }
+        renderList();
+      });
     probe(f)
       .then((info) => {
         c.info = info;
@@ -127,6 +172,7 @@ async function addFiles(files: FileList | File[]) {
 function removeClip(i: number) {
   const [c] = clips.splice(i, 1);
   URL.revokeObjectURL(c.url);
+  void forget(c.id);
   if (!clips.length) {
     cur = -1;
     vid.removeAttribute("src");
@@ -142,14 +188,23 @@ function statusText(c: Clip) {
   return ["To mark", false] as const;
 }
 
+function keptText(c: Clip): string {
+  if (c.keptUntil === null) return c.keepNote ? `Not kept after a refresh: ${c.keepNote}` : "Saving on this device…";
+  const min = Math.max(1, Math.ceil((c.keptUntil - Date.now()) / 60000));
+  return `Kept on this device for ${min} more min`;
+}
+
 function renderList() {
   const ol = $("clipList");
   ol.replaceChildren(
     ...clips.map((c, i) => {
       const li = document.createElement("li"), [st, done] = statusText(c);
       li.className = i === cur ? "cur" : "";
-      li.innerHTML = `<span class="nm"></span><span class="st${done ? " done" : ""}">${st}</span><button class="x" title="Remove">✕</button>`;
+      li.innerHTML = `<span class="nm"></span><span class="st${done ? " done" : ""}">${st}</span><button class="x" title="Remove">✕</button><span class="kp"></span>`;
       li.querySelector(".nm")!.textContent = c.file.name;
+      const kp = li.querySelector(".kp")!;
+      kp.textContent = keptText(c);
+      kp.classList.toggle("no", c.keptUntil === null && !!c.keepNote);
       li.onclick = (e) => {
         if ((e.target as HTMLElement).classList.contains("x")) removeClip(i);
         else select(i);
@@ -157,6 +212,7 @@ function renderList() {
       return li;
     }),
   );
+  $("clearAll").hidden = !clips.length;
   ($("prevClip") as HTMLButtonElement).disabled = cur <= 0;
   ($("nextClip") as HTMLButtonElement).disabled = cur >= clips.length - 1;
 }
@@ -821,16 +877,61 @@ $("exCancel").onclick = () => busy?.abort();
 
 syncShell();
 
+// ---------------------------------------------------------------- kept clips (this device only, one hour)
+// dev only: ?keep=60 shortens the hour to 60 s for testing
+if (import.meta.env.DEV && new URLSearchParams(location.search).has("keep"))
+  setKeepTime(+new URLSearchParams(location.search).get("keep")! * 1000);
+
+function dropClips(ids: string[], why: string) {
+  let n = 0;
+  for (const id of ids) {
+    const i = clips.findIndex((c) => c.id === id);
+    if (i >= 0) {
+      removeClip(i);
+      n++;
+    }
+  }
+  if (n) toast(why.replace("{n}", n === 1 ? "1 clip" : `${n} clips`), 5000);
+}
+
+async function expireTick() {
+  dropClips(await purgeExpired(), "Removed {n}: an hour passed without changes.");
+  purgeOldMarks();
+  renderList(); // refresh the minutes left
+}
+setInterval(expireTick, 20_000);
+
+$("clearAll").onclick = async () => {
+  if (!confirm("Remove every clip from this page and delete the copies kept on this device?")) return;
+  await forgetAll();
+  purgeOldMarks(true);
+  while (clips.length) removeClip(clips.length - 1);
+  toast("All clips cleared from this device");
+};
+
+const restored = restore().then((items) => {
+  purgeOldMarks();
+  if (items.length) {
+    addClips(items.map(({ meta, file }) => ({ file, id: meta.id, savedAt: meta.savedAt })));
+    toast(`Restored ${items.length === 1 ? "1 clip" : `${items.length} clips`} from the last hour`);
+  }
+});
+
 // dev only: ?load=/_local/clip.mp4&load=... loads clips from the dev server (public/_local is git-ignored)
 if (import.meta.env.DEV) {
   const urls = new URLSearchParams(location.search).getAll("load");
   if (urls.length)
-    Promise.all(
-      urls.map(async (u) => {
-        const b = await (await fetch(u)).blob();
-        return new File([b], u.split("/").pop()!, { type: b.type || "video/mp4", lastModified: 0 });
-      }),
-    ).then(addFiles);
+    restored
+      .then(() =>
+        Promise.all(
+          urls.map(async (u) => {
+            const b = await (await fetch(u)).blob();
+            return new File([b], u.split("/").pop()!, { type: b.type || "video/mp4", lastModified: 0 });
+          }),
+        ),
+      )
+      .then((fs) => fs.filter((f) => !clips.some((c) => keyOf(c.file) === keyOf(f))))
+      .then((fs) => void (fs.length && addFiles(fs)));
 }
 
 // handy for debugging in the console

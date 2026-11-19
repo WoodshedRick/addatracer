@@ -54,6 +54,9 @@ button, input, select { font: inherit; color: inherit; }
 .clip-list .st.done { color: var(--accent); }
 .clip-list .x { opacity: .5; border: 0; background: none; cursor: pointer; padding: 0 2px; }
 .clip-list .x:hover { opacity: 1; color: var(--danger); }
+.clip-list li { flex-wrap: wrap; }
+.clip-list .kp { flex-basis: 100%; font-size: 11px; color: var(--mute); }
+.clip-list .kp.no { color: var(--warn); }
 
 .center { min-width: 0; }
 .empty .drop { display: block; border: 2px dashed var(--line); border-radius: 14px; padding: 80px 20px; text-align: center; color: var(--mute); cursor: pointer; }
@@ -128,7 +131,8 @@ body.dragging .empty .drop, body.dragging .stage { outline: 2px dashed var(--acc
   .empty .drop { padding: 48px 16px; }
 
   /* clip list becomes a horizontal strip */
-  .clips .panel-h, .clips .hint { display: none; }
+  .clips .panel-h, .clips .hint + .hint { display: none; }
+  .clips .hint { font-size: 11px; }
   .clips .btn.block { margin-top: 0; }
   .clip-list { display: flex; overflow-x: auto; gap: 6px; margin-top: 8px; scrollbar-width: none; }
   .clip-list:empty { display: none; }

@@ -11,7 +11,7 @@
   <body>
     <header class="top">
       <div class="brand"><span class="logo" aria-hidden="true"></span>Flighted <small>free golf shot tracers, right in your browser</small></div>
-      <div class="privacy">Your clips never leave this computer.</div>
+      <div class="privacy">🔒 Your videos never leave your device.</div>
     </header>
 
     <main class="layout">
@@ -23,6 +23,8 @@
           <input id="fileIn" type="file" accept="video/*,.mov,.mp4,.m4v,.webm" multiple hidden />
         </label>
         <ol id="clipList" class="clip-list"></ol>
+        <button id="clearAll" class="btn sm block" hidden>Clear all now</button>
+        <p class="hint">Clips stay on this device only, for an hour after your last change, so a refresh won't lose them. No account, no uploads.</p>
         <p class="hint">Tripod / still-camera shots work best for now.</p>
       </aside>
 
