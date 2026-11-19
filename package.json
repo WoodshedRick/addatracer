@@ -1,0 +1,22 @@
+{
+  "name": "flighted",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "~7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^4.1.12"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "mediabunny": "^1.66.2"
+  }
+}
